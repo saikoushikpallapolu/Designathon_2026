@@ -7,10 +7,30 @@ import Footer from "@/components/Footer";
 export default function StatusPage() {
   const router = useRouter();
   const [token, setToken] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleCheck = () => {
-    if (token.trim()) {
+  const handleCheck = async () => {
+    if (!token.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Case not found");
+      }
+      const data = await res.json();
+      // Store in sessionStorage for the detail page to read
+      sessionStorage.setItem("caseStatus", JSON.stringify(data));
       router.push(`/status/${token.trim()}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to check status");
+      setLoading(false);
     }
   };
 
@@ -42,13 +62,28 @@ export default function StatusPage() {
               className="w-full rounded-lg border-slate-300 focus:ring-[#2C5F8A] focus:border-[#2C5F8A] font-mono text-lg text-center tracking-wider p-4"
               onKeyDown={(e) => e.key === "Enter" && handleCheck()}
             />
+            {error && (
+              <p className="mt-2 text-sm text-red-600 font-medium flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">error</span>
+                {error}
+              </p>
+            )}
             <button
               onClick={handleCheck}
-              disabled={!token.trim()}
+              disabled={!token.trim() || loading}
               className="w-full mt-4 bg-[#2C5F8A] text-white py-3 rounded-lg font-bold hover:bg-[#2C5F8A]/90 transition-all shadow-lg shadow-[#2C5F8A]/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              <span className="material-symbols-outlined">lock_open</span>
-              Check Status
+              {loading ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined">lock_open</span>
+                  Check Status
+                </>
+              )}
             </button>
           </div>
 

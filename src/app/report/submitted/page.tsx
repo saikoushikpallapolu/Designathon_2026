@@ -2,10 +2,25 @@
 import Link from "next/link";
 import { useState } from "react";
 import Footer from "@/components/Footer";
+import { useReportStore } from "@/store/reportStore";
+
+const severityLabels: Record<number, { label: string; color: string; bg: string; border: string }> = {
+  1: { label: "Severity 1 — Critical", color: "text-red-700", bg: "bg-red-50", border: "border-red-200" },
+  2: { label: "Severity 2 — Workplace Incident", color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
+  3: { label: "Severity 3 — Policy Breach", color: "text-blue-700", bg: "bg-blue-50", border: "border-blue-200" },
+  4: { label: "Severity 4 — Informational", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" },
+};
 
 export default function SubmittedPage() {
   const [copied, setCopied] = useState(false);
-  const token = "SVX-1842-KQZM-8371";
+  const { submissionResult, submitError } = useReportStore();
+
+  const token = submissionResult?.token ?? "SVX-XXXX-XXXX-XXXX";
+  const severity = submissionResult?.severity ?? 2;
+  const recommendation = submissionResult?.recommendation ?? "Your report has been assigned to an HR officer.";
+  const slaHours = submissionResult?.slaHours ?? 168;
+  const slaDays = Math.ceil(slaHours / 24);
+  const sev = severityLabels[severity] ?? severityLabels[2];
 
   const handleCopy = () => {
     navigator.clipboard.writeText(token);
@@ -36,6 +51,14 @@ export default function SubmittedPage() {
 
       {/* Main Content */}
       <main className="flex-grow flex flex-col items-center justify-start py-12 px-4 max-w-4xl mx-auto w-full">
+        {/* Error Banner */}
+        {submitError && (
+          <div className="w-full bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+            <span className="material-symbols-outlined text-red-500">error</span>
+            <p className="text-sm text-red-700 font-medium">{submitError}. Showing placeholder data below.</p>
+          </div>
+        )}
+
         {/* Status Header */}
         <div className="flex flex-col items-center text-center mb-10">
           <div className="w-16 h-16 bg-[#1A7F5A]/10 rounded-full flex items-center justify-center mb-4">
@@ -85,13 +108,13 @@ export default function SubmittedPage() {
             <span className="material-symbols-outlined">analytics</span>
             Initial assessment
           </h3>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-[#EF9F27] rounded-full text-xs font-bold mb-4 border border-amber-200">
-            <span className="w-2 h-2 rounded-full bg-[#EF9F27]" />
-            Severity 2 — Workplace Incident
+          <div className={`inline-flex items-center gap-2 px-3 py-1 ${sev.bg} ${sev.color} rounded-full text-xs font-bold mb-4 border ${sev.border}`}>
+            <span className={`w-2 h-2 rounded-full ${severity === 1 ? "bg-red-500" : severity === 2 ? "bg-[#EF9F27]" : severity === 3 ? "bg-blue-500" : "bg-slate-400"}`} />
+            {sev.label}
           </div>
           <p className="text-slate-600">
-            Your report has been assigned to an HR officer. Expected response within{" "}
-            <span className="font-bold text-slate-800">7 days</span>.
+            {recommendation}. Expected response within{" "}
+            <span className="font-bold text-slate-800">{slaDays} days</span>.
           </p>
         </div>
 

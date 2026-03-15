@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useReportStore } from "@/store/reportStore";
 
 const steps = [
   { label: "Report encrypted", status: "done" },
@@ -11,15 +12,25 @@ const steps = [
 export default function ProcessingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
+  const { submitting, submissionResult, submitError } = useReportStore();
 
   useEffect(() => {
-    const timers = [
-      setTimeout(() => setCurrentStep(1), 1200),
-      setTimeout(() => setCurrentStep(2), 2800),
-      setTimeout(() => router.push("/report/submitted"), 4500),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, [router]);
+    const t1 = setTimeout(() => setCurrentStep(1), 1200);
+    const t2 = setTimeout(() => setCurrentStep(2), 2800);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  // When submission completes (or errors), redirect
+  useEffect(() => {
+    if (!submitting && submissionResult) {
+      const t = setTimeout(() => router.push("/report/submitted"), 4500);
+      return () => clearTimeout(t);
+    }
+    if (!submitting && submitError) {
+      const t = setTimeout(() => router.push("/report/submitted"), 4500);
+      return () => clearTimeout(t);
+    }
+  }, [submitting, submissionResult, submitError, router]);
 
   const getStepIcon = (index: number) => {
     if (index < currentStep) {

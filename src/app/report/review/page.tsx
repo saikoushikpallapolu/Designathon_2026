@@ -179,7 +179,10 @@ export default function ReviewPage() {
         {/* Action Area */}
         <div className="mt-10 space-y-4">
           <button
-            onClick={() => router.push("/report/processing")}
+            onClick={() => {
+              store.submitReport();
+              router.push("/report/processing");
+            }}
             className="w-full bg-[#2C5F8A] hover:bg-[#2C5F8A]/90 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-3 transition-colors shadow-lg shadow-[#2C5F8A]/20"
           >
             <span className="material-symbols-outlined">verified_user</span>

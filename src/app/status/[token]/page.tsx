@@ -1,15 +1,112 @@
+"use client";
 import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
-const timelineEvents = [
-  { label: "Report received and encrypted", time: "Mar 12, 09:14", done: true },
-  { label: "AI assessment completed — routed to HR officer", time: "Mar 12, 09:15", done: true },
-  { label: "Investigator confirmed receipt", time: "Mar 12, 11:02", done: true },
-  { label: "Investigation in progress", time: "Estimated Mar 19", done: false },
-  { label: "Resolution", time: "Pending", done: false },
-];
+interface TimelineEntry {
+  action: string;
+  actorRole: string;
+  createdAt: string;
+}
 
-export default async function StatusDetailPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
+interface CaseData {
+  caseId: string;
+  severity: number;
+  status: string;
+  slaDeadline: string;
+  slaHours: number;
+  createdAt: string;
+  timeline: TimelineEntry[];
+}
+
+const statusLabels: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  open: { label: "Under Investigation", color: "text-blue-700", bg: "bg-blue-100", border: "border-blue-200" },
+  in_progress: { label: "In Progress", color: "text-blue-700", bg: "bg-blue-100", border: "border-blue-200" },
+  resolved: { label: "Resolved", color: "text-green-700", bg: "bg-green-100", border: "border-green-200" },
+  closed: { label: "Closed", color: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200" },
+  breached: { label: "SLA Breached", color: "text-red-700", bg: "bg-red-100", border: "border-red-200" },
+};
+
+export default function StatusDetailPage() {
+  const params = useParams();
+  const token = params.token as string;
+  const [caseData, setCaseData] = useState<CaseData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    // Try sessionStorage first (from status page redirect)
+    const cached = sessionStorage.getItem("caseStatus");
+    if (cached) {
+      setCaseData(JSON.parse(cached));
+      sessionStorage.removeItem("caseStatus");
+      setLoading(false);
+      return;
+    }
+
+    // Otherwise fetch from API
+    fetch("/api/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Case not found");
+        return res.json();
+      })
+      .then((data) => {
+        setCaseData(data);
+        setLoading(false);
+      })
+      .catch((e) => {
+        setError(e.message);
+        setLoading(false);
+      });
+  }, [token]);
+
+  // Calculate SLA progress
+  const getSLAProgress = () => {
+    if (!caseData) return { percentage: 0, remaining: "" };
+    const created = new Date(caseData.createdAt).getTime();
+    const deadline = new Date(caseData.slaDeadline).getTime();
+    const now = Date.now();
+    const total = deadline - created;
+    const elapsed = now - created;
+    const pct = Math.min(100, Math.round((elapsed / total) * 100));
+    const remainMs = deadline - now;
+    const remainDays = Math.ceil(remainMs / (1000 * 60 * 60 * 24));
+    const remaining = remainMs > 0 ? `${remainDays} day${remainDays !== 1 ? "s" : ""} remaining` : "Overdue";
+    return { percentage: pct, remaining };
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <span className="material-symbols-outlined text-[#2C5F8A] text-5xl animate-spin">progress_activity</span>
+          <p className="text-slate-600 font-medium">Loading case data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !caseData) {
+    return (
+      <div className="min-h-screen bg-[#F8F9FA] flex items-center justify-center">
+        <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center">
+          <span className="material-symbols-outlined text-red-500 text-5xl mb-4">error</span>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Case not found</h2>
+          <p className="text-slate-600 mb-6">{error || "The token you entered does not match any case."}</p>
+          <Link href="/status" className="text-[#2C5F8A] font-bold hover:underline">← Try again</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const { percentage, remaining } = getSLAProgress();
+  const sevColor = caseData.severity === 1 ? "amber-700" : caseData.severity === 2 ? "amber-700" : "blue-700";
+  const statInfo = statusLabels[caseData.status] ?? statusLabels.open;
+  const slaDays = Math.ceil(caseData.slaHours / 24);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
@@ -44,13 +141,13 @@ export default async function StatusDetailPage({ params }: { params: Promise<{ t
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 bg-amber-100 text-amber-700 px-4 py-2 rounded-full border border-amber-200">
+              <div className={`flex items-center gap-2 bg-amber-100 text-${sevColor} px-4 py-2 rounded-full border border-amber-200`}>
                 <span className="material-symbols-outlined text-base">priority_high</span>
-                <span className="text-sm font-bold">Severity 2</span>
+                <span className="text-sm font-bold">Severity {caseData.severity}</span>
               </div>
-              <div className="flex items-center gap-2 bg-blue-100 text-blue-700 px-4 py-2 rounded-full border border-blue-200">
+              <div className={`flex items-center gap-2 ${statInfo.bg} ${statInfo.color} px-4 py-2 rounded-full border ${statInfo.border}`}>
                 <span className="material-symbols-outlined text-base">search</span>
-                <span className="text-sm font-bold uppercase tracking-wide">Under Investigation</span>
+                <span className="text-sm font-bold uppercase tracking-wide">{statInfo.label}</span>
               </div>
             </div>
           </div>
@@ -66,18 +163,22 @@ export default async function StatusDetailPage({ params }: { params: Promise<{ t
                     Response deadline
                   </h3>
                   <span className="text-slate-900 font-bold text-sm bg-slate-100 px-2 py-1 rounded">
-                    43% Elapsed
+                    {percentage}% Elapsed
                   </span>
                 </div>
                 <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden mb-3">
                   <div
-                    className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: "43%" }}
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      percentage >= 80 ? "bg-red-500" : percentage >= 50 ? "bg-amber-500" : "bg-green-500"
+                    }`}
+                    style={{ width: `${Math.min(100, percentage)}%` }}
                   />
                 </div>
                 <p className="text-slate-500 text-sm">
-                  <span className="font-semibold text-amber-600">3 days remaining</span> of 7-day
-                  response window
+                  <span className={`font-semibold ${percentage >= 80 ? "text-red-600" : "text-amber-600"}`}>
+                    {remaining}
+                  </span>{" "}
+                  of {slaDays}-day response window
                 </p>
               </section>
 
@@ -85,35 +186,17 @@ export default async function StatusDetailPage({ params }: { params: Promise<{ t
               <section className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                 <h3 className="text-xl font-bold text-slate-900 mb-8 px-2">Case timeline</h3>
                 <div className="relative space-y-8 ml-4">
-                  {timelineEvents.map((event, i) => (
+                  {caseData.timeline.map((event, i) => (
                     <div key={i} className="relative pl-8">
-                      {i < timelineEvents.length - 1 && (
-                        <div
-                          className={`absolute left-[7px] top-5 w-0.5 h-full ${
-                            event.done && timelineEvents[i + 1]?.done
-                              ? "bg-green-500"
-                              : event.done
-                              ? "bg-slate-200"
-                              : "border-l-2 border-dashed border-slate-300 bg-transparent"
-                          }`}
-                        />
+                      {i < caseData.timeline.length - 1 && (
+                        <div className="absolute left-[7px] top-5 w-0.5 h-full bg-green-500" />
                       )}
-                      <div
-                        className={`absolute left-0 top-1 size-4 rounded-full border-4 z-10 ${
-                          event.done
-                            ? "bg-green-500 border-green-100"
-                            : "bg-slate-300 border-white"
-                        }`}
-                      />
+                      <div className="absolute left-0 top-1 size-4 rounded-full border-4 z-10 bg-green-500 border-green-100" />
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-1">
-                        <p
-                          className={`font-semibold ${
-                            event.done ? "text-slate-900" : "text-slate-500 italic"
-                          }`}
-                        >
-                          {event.label}
+                        <p className="font-semibold text-slate-900">{event.action}</p>
+                        <p className="text-xs text-slate-400 font-medium">
+                          {event.actorRole} • {new Date(event.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </p>
-                        <p className="text-xs text-slate-400 font-medium">{event.time}</p>
                       </div>
                     </div>
                   ))}
@@ -131,11 +214,11 @@ export default async function StatusDetailPage({ params }: { params: Promise<{ t
                 <div className="flex-grow space-y-6 mb-8">
                   <div className="bg-slate-50 p-4 rounded-lg border-l-4 border-[#2C5F8A]">
                     <p className="text-slate-700 text-sm leading-relaxed mb-2">
-                      &ldquo;Can you clarify approximately what time of day the March 8th incident
-                      occurred?&rdquo;
+                      &ldquo;Your report has been received and is under review. We may follow up with
+                      additional questions.&rdquo;
                     </p>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Investigator • Mar 13
+                      System • {new Date(caseData.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                     </span>
                   </div>
                 </div>
