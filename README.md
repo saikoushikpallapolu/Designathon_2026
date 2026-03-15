@@ -361,7 +361,8 @@ Department of Computer Science and Business Systems (CSBS)
 | Name | Role |
 |------|------|
 | Sai Koushik Pallapolu | Developer |
-| Shivani Yerram | Developer |
+| Veerabhadra Yerram | Developer |
+| Praharshita Gayatri Tata | Developer |
 
 ---
 
