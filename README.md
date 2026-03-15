@@ -99,7 +99,7 @@ SafeVoice creates a **zero-identity reporting system** where:
 |-----------|---------|
 | NextAuth.js | Role-based authentication |
 | PostgreSQL + Prisma | Persistent database with ORM |
-| Anthropic Claude API | AI report classification engine |
+| Groq API | AI report classification engine |
 | bcrypt + AES-256 | Token hashing and report encryption |
 
 ---
